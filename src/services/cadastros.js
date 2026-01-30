@@ -5,9 +5,9 @@
 
 // Chaves do localStorage
 const STORAGE_KEYS = {
-  PRODUTOS: 'aficfrio_produtos',
-  MARCAS: 'aficfrio_marcas',
-  TECNICOS: 'aficfrio_tecnicos'
+  PRODUTOS: 'techos_produtos',
+  MARCAS: 'techos_marcas',
+  TECNICOS: 'techos_tecnicos'
 }
 
 // Dados iniciais padrão

@@ -1,5 +1,6 @@
 /**
  * Componente de Impressão de Contrato
+ * Usa dados da empresa logada para cabeçalho e termos
  */
 import {
   formatDate,
@@ -7,20 +8,27 @@ import {
   formatOSNumber,
   formatMoney,
   formatCep,
-  formatFullAddress,
   getLabelByValue
 } from '../utils/helpers'
 import {
-  COMPANY_INFO,
-  SERVICE_TERMS,
+  DEFAULT_SERVICE_TERMS,
   PAYMENT_METHODS
 } from '../utils/constants'
 import { Button } from './ui'
 
-export function ContractPrint({ ordem, onClose, produtosMap = {}, marcasMap = {} }) {
+export function ContractPrint({ ordem, onClose, produtosMap = {}, marcasMap = {}, empresa = {} }) {
   // Helpers para obter nomes dos cadastros
   const getProdutoNome = (id) => produtosMap[id] || '-'
   const getMarcaNome = (id) => marcasMap[id] || '-'
+
+  // Dados da empresa com fallback
+  const empresaNome = empresa.nomeFantasia || empresa.nome || 'Empresa'
+  const empresaEndereco = empresa.endereco || ''
+  const empresaCidade = empresa.cidade ? `${empresa.cidade} - ${empresa.uf || ''}` : ''
+  const empresaTelefone = empresa.telefone ? formatPhone(empresa.telefone) : ''
+  const empresaEmail = empresa.email || ''
+  const termos = empresa.termos || DEFAULT_SERVICE_TERMS
+
   return (
     <div className="print-contract">
       {/* Botão de fechar (não aparece na impressão) */}
@@ -43,8 +51,8 @@ export function ContractPrint({ ordem, onClose, produtosMap = {}, marcasMap = {}
                 </svg>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{COMPANY_INFO.name}</h1>
-                <p className="text-sm text-gray-600">{COMPANY_INFO.subtitle}</p>
+                <h1 className="text-2xl font-bold text-gray-900">{empresaNome}</h1>
+                {empresa.cnpj && <p className="text-sm text-gray-600">CNPJ: {empresa.cnpj}</p>}
               </div>
             </div>
 
@@ -54,10 +62,16 @@ export function ContractPrint({ ordem, onClose, produtosMap = {}, marcasMap = {}
             </div>
           </div>
 
-          <div className="mt-3 text-xs text-gray-500">
-            <p>{COMPANY_INFO.address} - {COMPANY_INFO.city}</p>
-            <p>Tel: {COMPANY_INFO.phone} | {COMPANY_INFO.email}</p>
-          </div>
+          {(empresaEndereco || empresaTelefone || empresaEmail) && (
+            <div className="mt-3 text-xs text-gray-500">
+              {empresaEndereco && <p>{empresaEndereco} {empresaCidade && `- ${empresaCidade}`}</p>}
+              <p>
+                {empresaTelefone && `Tel: ${empresaTelefone}`}
+                {empresaTelefone && empresaEmail && ' | '}
+                {empresaEmail}
+              </p>
+            </div>
+          )}
         </header>
 
         {/* Número da OS e Categoria */}
@@ -213,8 +227,8 @@ export function ContractPrint({ ordem, onClose, produtosMap = {}, marcasMap = {}
           <h3 className="text-xs font-bold text-white bg-gray-700 px-2 py-1 mb-2">
             TERMOS E CONDIÇÕES
           </h3>
-          <div className="text-[10px] text-gray-600 leading-tight px-1">
-            {SERVICE_TERMS}
+          <div className="text-[10px] text-gray-600 leading-tight px-1 whitespace-pre-line">
+            {termos}
           </div>
         </section>
 
@@ -223,7 +237,7 @@ export function ContractPrint({ ordem, onClose, produtosMap = {}, marcasMap = {}
           <div className="grid grid-cols-2 gap-8">
             <div className="text-center">
               <div className="border-t border-gray-800 pt-2 mt-12">
-                <p className="text-sm font-medium">{COMPANY_INFO.name}</p>
+                <p className="text-sm font-medium">{empresaNome}</p>
                 <p className="text-xs text-gray-500">Responsável Técnico</p>
               </div>
             </div>

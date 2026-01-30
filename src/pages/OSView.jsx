@@ -15,6 +15,8 @@ import {
 import { ContractPrint } from '../components/ContractPrint'
 import { osService } from '../services/api'
 import { produtosService, marcasService, tecnicosService } from '../services/cadastros'
+import { configEmpresaService } from '../services/multitenancy'
+import { useAuth } from '../contexts/AuthContext'
 import {
   formatDate,
   formatPhone,
@@ -34,6 +36,7 @@ import {
 export function OSView() {
   const navigate = useNavigate()
   const { id } = useParams()
+  const { user } = useAuth()
 
   const [ordem, setOrdem] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -45,6 +48,7 @@ export function OSView() {
   const [produtosMap, setProdutosMap] = useState({})
   const [marcasMap, setMarcasMap] = useState({})
   const [tecnicosMap, setTecnicosMap] = useState({})
+  const [empresa, setEmpresa] = useState({})
 
   useEffect(() => {
     loadOrdem()
@@ -74,6 +78,14 @@ export function OSView() {
       const map = {}
       tecnicosRes.data.forEach(t => { map[t.id] = t.nome })
       setTecnicosMap(map)
+    }
+
+    // Carrega dados da empresa para impressão
+    if (user?.empresaId) {
+      const empresaRes = await configEmpresaService.get(user.empresaId)
+      if (empresaRes.success) {
+        setEmpresa(empresaRes.data)
+      }
     }
   }
 
@@ -374,6 +386,7 @@ export function OSView() {
           onClose={() => setShowPrint(false)}
           produtosMap={produtosMap}
           marcasMap={marcasMap}
+          empresa={empresa}
         />
       )}
     </>

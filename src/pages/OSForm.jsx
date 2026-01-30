@@ -18,6 +18,7 @@ import {
 import { osService } from '../services/api'
 import { buscarCep } from '../services/viaCep'
 import { getProdutosOptions, getMarcasOptions, getTecnicosOptions } from '../services/cadastros'
+import { clientesService } from '../services/clientes'
 import { validateOSForm } from '../utils/validators'
 import { formatDate, formatOSNumber } from '../utils/helpers'
 import {
@@ -26,12 +27,14 @@ import {
   PAYMENT_METHODS,
   ESTADOS_BR
 } from '../utils/constants'
+import { PhotoUpload } from '../components/PhotoUpload'
 
 // Estado inicial do formulário
 const initialFormData = {
   categoria: '',
   status: 'aberta',
   // Cliente
+  clienteId: '',
   clienteNome: '',
   clienteTelefone: '',
   // Endereço
@@ -57,7 +60,9 @@ const initialFormData = {
   defeito: '',
   pendencias: '',
   historicoVisitas: '',
-  garantias: ''
+  garantias: '',
+  // Fotos
+  fotos: []
 }
 
 export function OSForm() {
@@ -78,6 +83,12 @@ export function OSForm() {
   const [marcasOptions, setMarcasOptions] = useState([])
   const [tecnicosOptions, setTecnicosOptions] = useState([{ value: '', label: 'Não atribuído' }])
 
+  // Busca de clientes
+  const [clienteSearch, setClienteSearch] = useState('')
+  const [clienteResults, setClienteResults] = useState([])
+  const [showClienteDropdown, setShowClienteDropdown] = useState(false)
+  const [searchingCliente, setSearchingCliente] = useState(false)
+
   // Carrega opções dos cadastros
   useEffect(() => {
     async function loadOptions() {
@@ -92,6 +103,78 @@ export function OSForm() {
     }
     loadOptions()
   }, [])
+
+  // Busca clientes conforme digita
+  useEffect(() => {
+    const searchClientes = async () => {
+      if (clienteSearch.length < 2) {
+        setClienteResults([])
+        return
+      }
+      setSearchingCliente(true)
+      try {
+        const result = await clientesService.search(clienteSearch)
+        if (result.success) {
+          setClienteResults(result.data)
+        }
+      } finally {
+        setSearchingCliente(false)
+      }
+    }
+
+    const debounce = setTimeout(searchClientes, 300)
+    return () => clearTimeout(debounce)
+  }, [clienteSearch])
+
+  // Seleciona um cliente e preenche os campos
+  const handleSelectCliente = (cliente) => {
+    setFormData(prev => ({
+      ...prev,
+      clienteId: cliente.id,
+      clienteNome: cliente.nome,
+      clienteTelefone: cliente.telefone,
+      enderecoCep: cliente.enderecoCep || prev.enderecoCep,
+      enderecoRua: cliente.enderecoRua || prev.enderecoRua,
+      enderecoNumero: cliente.enderecoNumero || prev.enderecoNumero,
+      enderecoComplemento: cliente.enderecoComplemento || prev.enderecoComplemento,
+      enderecoBairro: cliente.enderecoBairro || prev.enderecoBairro,
+      enderecoCidade: cliente.enderecoCidade || prev.enderecoCidade,
+      enderecoUf: cliente.enderecoUf || prev.enderecoUf,
+      enderecoPontoReferencia: cliente.enderecoPontoReferencia || prev.enderecoPontoReferencia
+    }))
+    setClienteSearch('')
+    setShowClienteDropdown(false)
+    setClienteResults([])
+    // Limpa erros relacionados
+    setErrors(prev => ({
+      ...prev,
+      clienteNome: '',
+      clienteTelefone: '',
+      enderecoCep: '',
+      enderecoRua: '',
+      enderecoBairro: '',
+      enderecoCidade: '',
+      enderecoUf: ''
+    }))
+  }
+
+  // Limpa seleção de cliente
+  const handleClearCliente = () => {
+    setFormData(prev => ({
+      ...prev,
+      clienteId: '',
+      clienteNome: '',
+      clienteTelefone: '',
+      enderecoCep: '',
+      enderecoRua: '',
+      enderecoNumero: '',
+      enderecoComplemento: '',
+      enderecoBairro: '',
+      enderecoCidade: '',
+      enderecoUf: '',
+      enderecoPontoReferencia: ''
+    }))
+  }
 
   // Carrega dados da OS se estiver editando
   useEffect(() => {
@@ -214,8 +297,14 @@ export function OSForm() {
     { id: 'defeito', label: 'Defeito' },
     { id: 'pendencias', label: 'Pendências' },
     { id: 'historicoVisitas', label: 'Visitas' },
-    { id: 'garantias', label: 'Garantias' }
+    { id: 'garantias', label: 'Garantias' },
+    { id: 'fotos', label: 'Fotos' }
   ]
+
+  // Handler para atualização de fotos
+  const handlePhotosChange = (newPhotos) => {
+    setFormData(prev => ({ ...prev, fotos: newPhotos }))
+  }
 
   return (
     <Layout>
@@ -303,6 +392,62 @@ export function OSForm() {
               <CardTitle>Cliente</CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Busca de Cliente Cadastrado */}
+              <div className="mb-4 pb-4 border-b border-gray-200">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Buscar Cliente Cadastrado
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={clienteSearch}
+                    onChange={(e) => {
+                      setClienteSearch(e.target.value)
+                      setShowClienteDropdown(true)
+                    }}
+                    onFocus={() => setShowClienteDropdown(true)}
+                    placeholder="Digite nome, telefone ou CPF/CNPJ..."
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+                  />
+                  {searchingCliente && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loading size="sm" />
+                    </div>
+                  )}
+                  {/* Dropdown de resultados */}
+                  {showClienteDropdown && clienteResults.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                      {clienteResults.map(cliente => (
+                        <button
+                          key={cliente.id}
+                          type="button"
+                          onClick={() => handleSelectCliente(cliente)}
+                          className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                        >
+                          <div className="font-medium text-gray-900">{cliente.nome}</div>
+                          <div className="text-sm text-gray-500">
+                            {cliente.telefone} {cliente.enderecoCidade && `- ${cliente.enderecoCidade}/${cliente.enderecoUf}`}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {formData.clienteId && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-sm text-green-600">Cliente selecionado</span>
+                    <button
+                      type="button"
+                      onClick={handleClearCliente}
+                      className="text-sm text-red-600 hover:text-red-800"
+                    >
+                      Limpar
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Campos do Cliente */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="Nome"
@@ -570,6 +715,22 @@ export function OSForm() {
                 placeholder="Informações sobre garantias..."
                 rows={5}
               />
+            )}
+
+            {activeTab === 'fotos' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Fotos do Serviço
+                </label>
+                <PhotoUpload
+                  photos={formData.fotos || []}
+                  onChange={handlePhotosChange}
+                  maxPhotos={5}
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  Adicione fotos do equipamento, defeito ou serviço realizado.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>

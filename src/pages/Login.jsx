@@ -84,8 +84,8 @@ export function Login() {
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-white">AficFrio</h1>
-          <p className="text-primary-200 mt-1">Sistema de Ordens de Serviço</p>
+          <h1 className="text-3xl font-bold text-white">TechOS</h1>
+          <p className="text-primary-200 mt-1">Gestão de Ordens de Serviço</p>
         </div>
 
         {/* Card de login */}
@@ -137,10 +137,14 @@ export function Login() {
 
             {/* Dica para desenvolvimento */}
             <div className="mt-6 p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-500 text-center">
-                <strong>Ambiente de desenvolvimento:</strong><br />
-                Use qualquer email válido com a senha <code className="bg-gray-200 px-1 rounded">123456</code>
+              <p className="text-xs text-gray-500 text-center mb-2">
+                <strong>Usuários de teste</strong> (senha: <code className="bg-gray-200 px-1 rounded">123456</code>)
               </p>
+              <div className="text-xs text-gray-500 space-y-1">
+                <p><code className="bg-gray-200 px-1 rounded">super@admin.com</code> - Super Admin</p>
+                <p><code className="bg-gray-200 px-1 rounded">admin@empresa.com</code> - Admin Empresa</p>
+                <p><code className="bg-gray-200 px-1 rounded">usuario@empresa.com</code> - Usuário</p>
+              </div>
             </div>
           </CardContent>
         </Card>

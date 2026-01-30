@@ -76,13 +76,31 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Verifica se usuário tem determinada role
+  const hasRole = (role) => {
+    if (!user) return false
+    if (Array.isArray(role)) {
+      return role.includes(user.role)
+    }
+    return user.role === role
+  }
+
+  // Atalhos para verificar roles
+  const isSuperAdmin = () => hasRole('super_admin')
+  const isAdminEmpresa = () => hasRole('admin_empresa')
+  const isUser = () => hasRole('user')
+
   // Valores expostos pelo contexto
   const value = {
     user,
     loading,
     isAuthenticated: !!user,
     login,
-    logout
+    logout,
+    hasRole,
+    isSuperAdmin,
+    isAdminEmpresa,
+    isUser
   }
 
   return (

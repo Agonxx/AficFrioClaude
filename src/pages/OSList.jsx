@@ -4,9 +4,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/layout'
-import { Button, Badge, Card, Loading } from '../components/ui'
+import { Button, Badge, Card, Loading, Select } from '../components/ui'
 import { osService } from '../services/api'
-import { produtosService, marcasService } from '../services/cadastros'
+import { produtosService, marcasService, tecnicosService } from '../services/cadastros'
 import {
   formatDate,
   formatOSNumber,
@@ -16,6 +16,7 @@ import {
   getCategoryColor
 } from '../utils/helpers'
 import { OS_STATUS, OS_CATEGORIES } from '../utils/constants'
+import { exportToCSV, exportToPDF, getOSExportColumns } from '../utils/export'
 
 export function OSList() {
   const navigate = useNavigate()
@@ -27,6 +28,17 @@ export function OSList() {
   // Mapas para lookup de nomes
   const [produtosMap, setProdutosMap] = useState({})
   const [marcasMap, setMarcasMap] = useState({})
+  const [tecnicosMap, setTecnicosMap] = useState({})
+
+  // Filtros
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState({
+    status: '',
+    categoria: '',
+    tecnicoId: '',
+    dataInicio: '',
+    dataFim: ''
+  })
 
   useEffect(() => {
     loadOrdens()
@@ -34,9 +46,10 @@ export function OSList() {
   }, [])
 
   const loadCadastros = async () => {
-    const [produtosRes, marcasRes] = await Promise.all([
+    const [produtosRes, marcasRes, tecnicosRes] = await Promise.all([
       produtosService.getAll(),
-      marcasService.getAll()
+      marcasService.getAll(),
+      tecnicosService.getAll()
     ])
 
     if (produtosRes.success) {
@@ -50,6 +63,45 @@ export function OSList() {
       marcasRes.data.forEach(m => { map[m.id] = m.nome })
       setMarcasMap(map)
     }
+
+    if (tecnicosRes.success) {
+      const map = {}
+      tecnicosRes.data.forEach(t => { map[t.id] = t.nome })
+      setTecnicosMap(map)
+    }
+  }
+
+  // Handler para mudança de filtros
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target
+    setFilters(prev => ({ ...prev, [name]: value }))
+  }
+
+  // Limpa todos os filtros
+  const clearFilters = () => {
+    setFilters({
+      status: '',
+      categoria: '',
+      tecnicoId: '',
+      dataInicio: '',
+      dataFim: ''
+    })
+  }
+
+  // Verifica se há filtros ativos
+  const hasActiveFilters = Object.values(filters).some(v => v !== '')
+
+  // Exportar para CSV
+  const handleExportCSV = () => {
+    const columns = getOSExportColumns(produtosMap, marcasMap, tecnicosMap)
+    exportToCSV(filteredOrdens, 'ordens-servico', columns)
+  }
+
+  // Exportar para PDF
+  const handleExportPDF = () => {
+    const columns = getOSExportColumns(produtosMap, marcasMap, tecnicosMap)
+    const subtitle = hasActiveFilters ? 'Relatório filtrado' : 'Relatório completo'
+    exportToPDF(filteredOrdens, 'Ordens de Serviço', columns, { subtitle })
   }
 
   const loadOrdens = async () => {
@@ -72,18 +124,62 @@ export function OSList() {
   const getProdutoNome = (id) => produtosMap[id] || '-'
   const getMarcaNome = (id) => marcasMap[id] || '-'
 
-  // Filtra ordens baseado no termo de busca
+  // Filtra ordens baseado no termo de busca e filtros
   const filteredOrdens = useMemo(() => {
-    if (!searchTerm.trim()) return ordens
+    let result = ordens
 
-    const term = searchTerm.toLowerCase()
-    return ordens.filter(os =>
-      os.clienteNome.toLowerCase().includes(term) ||
-      String(os.id).includes(term) ||
-      getProdutoNome(os.equipamentoTipo).toLowerCase().includes(term) ||
-      getMarcaNome(os.equipamentoMarca).toLowerCase().includes(term)
-    )
-  }, [ordens, searchTerm, produtosMap, marcasMap])
+    // Filtro de busca textual
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase()
+      result = result.filter(os =>
+        os.clienteNome.toLowerCase().includes(term) ||
+        String(os.id).includes(term) ||
+        getProdutoNome(os.equipamentoTipo).toLowerCase().includes(term) ||
+        getMarcaNome(os.equipamentoMarca).toLowerCase().includes(term)
+      )
+    }
+
+    // Filtro por status
+    if (filters.status) {
+      result = result.filter(os => os.status === filters.status)
+    }
+
+    // Filtro por categoria
+    if (filters.categoria) {
+      result = result.filter(os => os.categoria === filters.categoria)
+    }
+
+    // Filtro por técnico
+    if (filters.tecnicoId) {
+      result = result.filter(os => String(os.tecnicoId) === filters.tecnicoId)
+    }
+
+    // Filtro por data início
+    if (filters.dataInicio) {
+      const dataInicio = new Date(filters.dataInicio)
+      result = result.filter(os => new Date(os.dataAbertura) >= dataInicio)
+    }
+
+    // Filtro por data fim
+    if (filters.dataFim) {
+      const dataFim = new Date(filters.dataFim)
+      dataFim.setHours(23, 59, 59, 999)
+      result = result.filter(os => new Date(os.dataAbertura) <= dataFim)
+    }
+
+    return result
+  }, [ordens, searchTerm, filters, produtosMap, marcasMap])
+
+  // Opções para filtro de técnicos
+  const tecnicosOptions = useMemo(() => {
+    return [
+      { value: '', label: 'Todos' },
+      ...Object.entries(tecnicosMap).map(([id, nome]) => ({
+        value: String(id),
+        label: nome
+      }))
+    ]
+  }, [tecnicosMap])
 
   const handleRowClick = (id) => {
     navigate(`/os/${id}`)
@@ -118,32 +214,148 @@ export function OSList() {
             <h2 className="text-2xl font-bold text-gray-900">Ordens de Serviço</h2>
             <p className="text-gray-600 mt-1">Gerencie todas as ordens de serviço</p>
           </div>
-          <Button onClick={() => navigate('/os/nova')}>
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Nova OS
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {/* Botões de Exportação */}
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={handleExportCSV} title="Exportar CSV">
+                <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                CSV
+              </Button>
+              <Button variant="secondary" onClick={handleExportPDF} title="Exportar PDF">
+                <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                PDF
+              </Button>
+            </div>
+            <Button onClick={() => navigate('/os/nova')}>
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Nova OS
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Barra de busca */}
+      {/* Barra de busca e filtros */}
       <Card className="mb-6">
         <div className="p-4">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Buscar por número, cliente ou equipamento..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Buscar por número, cliente ou equipamento..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
-            />
+            <Button
+              variant={showFilters ? 'primary' : 'secondary'}
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              Filtros
+              {hasActiveFilters && (
+                <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+              )}
+            </Button>
           </div>
+
+          {/* Painel de Filtros */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    name="status"
+                    value={filters.status}
+                    onChange={handleFilterChange}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Todos</option>
+                    {OS_STATUS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                  <select
+                    name="categoria"
+                    value={filters.categoria}
+                    onChange={handleFilterChange}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">Todas</option>
+                    {OS_CATEGORIES.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Técnico</label>
+                  <select
+                    name="tecnicoId"
+                    value={filters.tecnicoId}
+                    onChange={handleFilterChange}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    {tecnicosOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data Início</label>
+                  <input
+                    type="date"
+                    name="dataInicio"
+                    value={filters.dataInicio}
+                    onChange={handleFilterChange}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data Fim</label>
+                  <input
+                    type="date"
+                    name="dataFim"
+                    value={filters.dataFim}
+                    onChange={handleFilterChange}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+              </div>
+
+              {hasActiveFilters && (
+                <div className="mt-3 flex justify-end">
+                  <button
+                    onClick={clearFilters}
+                    className="text-sm text-primary-600 hover:text-primary-800"
+                  >
+                    Limpar filtros
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Card>
 

@@ -142,6 +142,31 @@ const getHeaders = () => {
   }
 }
 
+// Usuários mock para teste (senha: 123456)
+const MOCK_USERS = [
+  {
+    id: 1,
+    name: 'Super Admin',
+    email: 'super@admin.com',
+    role: 'super_admin',
+    empresaId: null
+  },
+  {
+    id: 2,
+    name: 'Admin Empresa',
+    email: 'admin@empresa.com',
+    role: 'admin_empresa',
+    empresaId: 1
+  },
+  {
+    id: 3,
+    name: 'Usuário Teste',
+    email: 'usuario@empresa.com',
+    role: 'user',
+    empresaId: 1
+  }
+]
+
 /**
  * Serviço de Autenticação
  */
@@ -149,19 +174,15 @@ export const authService = {
   async login(email, password) {
     await delay(800)
 
-    if (password === '123456') {
-      const mockUser = {
-        id: 1,
-        name: 'Administrador',
-        email: email,
-        role: 'admin'
-      }
+    const user = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase())
+
+    if (user && password === '123456') {
       const mockToken = 'mock_jwt_token_' + Date.now()
 
       return {
         success: true,
         data: {
-          user: mockUser,
+          user: { ...user },
           token: mockToken,
           expiresIn: 86400
         }

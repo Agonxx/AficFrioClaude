@@ -50,24 +50,13 @@ export const ESTADOS_BR = [
 
 // Chaves do localStorage
 export const STORAGE_KEYS = {
-  TOKEN: 'aficfrio_token',
-  USER: 'aficfrio_user',
-  OS_LIST: 'aficfrio_os_list'
+  TOKEN: 'techos_token',
+  USER: 'techos_user',
+  OS_LIST: 'techos_os_list'
 }
 
-// Dados da empresa para impressão
-export const COMPANY_INFO = {
-  name: 'AFIC FRIO',
-  subtitle: 'Loja 2',
-  cnpj: '00.000.000/0001-00',
-  address: 'Rua Exemplo, 123 - Centro',
-  city: 'São Paulo - SP',
-  phone: '(11) 99999-9999',
-  email: 'contato@aficfrio.com.br'
-}
-
-// Termos de serviço para contrato
-export const SERVICE_TERMS = `
+// Termos de serviço padrão (usado quando empresa não tem termos próprios)
+export const DEFAULT_SERVICE_TERMS = `
 1. O prazo de garantia dos serviços prestados é de 90 (noventa) dias, contados a partir da data de conclusão do serviço.
 
 2. A garantia não cobre defeitos causados por mau uso, quedas, variações de energia elétrica, ou interferência de terceiros.
